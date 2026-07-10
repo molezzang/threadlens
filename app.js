@@ -3,6 +3,12 @@
 
 /* collect.js와 동일 내용 내장 — 서버(Node) 없이 index.html만 열어도 [수집 스크립트 복사]가 작동하도록 */
 const COLLECT_SCRIPT = String.raw`(async () => {
+  /* 탭을 백그라운드로 둬도 Threads가 무한스크롤 로딩을 멈추지 않도록 visibility 위장 */
+  (function(){const def=(o,k,v)=>{try{Object.defineProperty(o,k,{get:()=>v,configurable:true})}catch(e){}};
+    const on=()=>{def(document,'visibilityState','visible');def(document,'hidden',false);def(document,'webkitHidden',false)};
+    on(); document.hasFocus=()=>true;
+    window.__tlVis && clearInterval(window.__tlVis);
+    window.__tlVis=setInterval(()=>{on();document.dispatchEvent(new Event('visibilitychange'))},120);})();
   const P = { posts: {} };
   const pk = s => {
     s = (s || "").replace(/,/g, "").trim();
