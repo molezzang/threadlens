@@ -342,6 +342,8 @@ async function syncThreads(P, onStatus) {
   }
   P.isDemo = false;
   P.lastSync = new Date().toISOString();
+  P.lastHarvest = P.lastSync;
+  snapshotProfile(P);
   store.save();
   return { added, updated, total: list.length };
 }
@@ -353,6 +355,49 @@ async function refreshToken(P) {
   store.save();
   return j.expires_in;
 }
+
+/* ============================== 수집 가져오기 & 추적 스냅샷 ============================== */
+/* 수집(가져오기)할 때마다 계정 상태를 스냅샷으로 남겨 시간축 추적 — 하루 1개로 병합 */
+function snapshotProfile(P) {
+  P.snapshots = P.snapshots || [];
+  const snap = {
+    at: new Date().toISOString(),
+    followers: P.followers || 0,
+    posts: P.posts.length,
+    totE: P.posts.reduce((a, p) => a + engage(p), 0)
+  };
+  const last = P.snapshots[P.snapshots.length - 1];
+  if (last && last.at.slice(0, 10) === snap.at.slice(0, 10)) P.snapshots[P.snapshots.length - 1] = snap;
+  else P.snapshots.push(snap);
+  if (P.snapshots.length > 200) P.snapshots.shift();
+}
+function importHarvestJSON(j) {
+  if (!j || !Array.isArray(j.posts) || !j.posts.length) throw new Error("수집된 게시물이 0건입니다.");
+  let target = store.data.profiles.find(x => x.handle === j.handle);
+  if (!target) {
+    target = { id: uid(), name: j.name || j.handle, handle: j.handle, followers: j.followers || 0, category: "미분류", posts: [] };
+    store.data.profiles.push(target);
+  } else {
+    if (j.name) target.name = j.name;
+    if (j.followers) target.followers = j.followers;
+  }
+  if (target.isDemo) { target.posts = []; target.isDemo = false; }
+  let added = 0, updated = 0;
+  j.posts.forEach(np => {
+    const ex = target.posts.find(x => x.tid === np.tid);
+    if (ex) {
+      ex.text = np.text; ex.at = np.at; ex.likes = np.likes; ex.replies = np.replies; ex.reposts = np.reposts; ex.shares = np.shares;
+      if (np.views) ex.views = np.views;
+      updated++;
+    } else { target.posts.push({ id: uid(), ...np }); added++; }
+  });
+  target.lastHarvest = j.harvestedAt || new Date().toISOString();
+  snapshotProfile(target);
+  store.data.activeId = target.id;
+  store.save();
+  return { target, added, updated };
+}
+window.__mergeHarvest = importHarvestJSON;
 
 /* ============================== 차트 ============================== */
 const tooltip = $("#tooltip");
@@ -398,7 +443,7 @@ function barChart(el, data, { color = "var(--s-blue)", hi = [], h = 220, fmt = f
 }
 
 /* 라인+영역 워시 (단일 시리즈, 끝점 마커 8px + 서피스 링) */
-function areaLine(el, pts, { h = 200, color = "var(--gold)", fmt = fmtC, labels = [] } = {}) {
+function areaLine(el, pts, { h = 200, color = "var(--gold)", fmt = fmtC, labels = [], tipLabel = "반응값" } = {}) {
   if (pts.length < 2) { el.innerHTML = '<div class="empty">데이터가 2건 이상 필요합니다</div>'; return; }
   const W = 900, H = h, padL = 44, padB = 22, padT = 12;
   const max = niceMax(Math.max(...pts, 1));
@@ -424,7 +469,7 @@ function areaLine(el, pts, { h = 200, color = "var(--gold)", fmt = fmtC, labels 
     ${hits}</svg>`;
   $$(".ln-hit", el).forEach(hit => {
     const i = +hit.dataset.i;
-    tipOn(hit, `<b>${labels[i] || i + 1}</b><br>반응값 ${fmtN(pts[i])}`);
+    tipOn(hit, `<b>${labels[i] || i + 1}</b><br>${tipLabel} ${fmtN(pts[i])}`);
   });
 }
 
@@ -478,7 +523,12 @@ function renderDashboard() {
   const rAvg = stats(recent).avgE, pAvg = prev.length ? stats(prev).avgE : rAvg;
   const delta = pAvg ? ((rAvg - pAvg) / pAvg * 100) : 0;
   const top = [...posts].sort((a, b) => engage(b) - engage(a)).slice(0, 3);
+  const snaps = P.snapshots || [];
   el.innerHTML = vhead("Result Report", "우상향 리포트", `${esc(P.name)}의 게시물 ${posts.length}건으로 정리한 결과값 브리핑입니다. 결과값에는 이유가 있습니다.`) + `
+    ${P.isDemo ? `<div class="card" style="border-color:rgba(217,184,120,.4);margin-bottom:16px">
+      <h3>👋 지금 보시는 건 데모 데이터입니다</h3>
+      <p class="hint" style="margin-top:8px">위 <b style="color:var(--gold-2)">⚡ 바로 분석</b> 입력창에 스레드 프로필 주소(예: <code>threads.com/@아이디</code>)를 붙여넣으면 진짜 분석이 시작됩니다. 내 계정이든 벤치마킹할 계정이든 다 됩니다.</p>
+    </div>` : ""}
     <div class="grid g2">
       <div class="card">
         <h3>평균 반응값 <span class="sub">좋아요 + 답글×2 + 리포스트·공유×3</span></h3>
@@ -496,12 +546,22 @@ function renderDashboard() {
       <h3>결과값 흐름 <span class="sub">발행 순서대로 본 글별 반응값 — 점이 모여 선이 됩니다</span></h3>
       <div class="chart-wrap" id="dashLine"></div>
     </div>
+    ${snaps.length >= 2 ? `<div class="card">
+      <h3>계정 추적 추이 <span class="sub">수집할 때마다 자동 기록 — ${snaps.length}회 수집</span></h3>
+      <div class="grid g3 mt16" style="gap:12px">
+        <div class="tile"><div class="label">팔로워</div><div class="value" style="font-size:22px">${fmtC(snaps[snaps.length - 1].followers)}</div><div class="delta ${snaps[snaps.length - 1].followers - snaps[0].followers >= 0 ? "up" : "down"}">${snaps[snaps.length - 1].followers - snaps[0].followers >= 0 ? "▲" : "▼"}${fmtN(Math.abs(snaps[snaps.length - 1].followers - snaps[0].followers))} (첫 수집 대비)</div></div>
+        <div class="tile"><div class="label">누적 게시물</div><div class="value" style="font-size:22px">${fmtN(snaps[snaps.length - 1].posts)}</div><div class="delta">첫 수집 때 ${fmtN(snaps[0].posts)}건</div></div>
+        <div class="tile"><div class="label">누적 반응값</div><div class="value" style="font-size:22px">${fmtC(snaps[snaps.length - 1].totE)}</div><div class="delta up">▲${fmtC(Math.max(0, snaps[snaps.length - 1].totE - snaps[0].totE))}</div></div>
+      </div>
+      <div class="chart-wrap" id="snapLine"></div>
+    </div>` : `<div class="hint" style="margin:4px 2px 16px">📈 다음에 이 계정을 다시 수집하면(상단 ⚡ 바로 분석 또는 계정 목록의 [⟳ 최신화]) 팔로워·반응값 변화가 추적 그래프로 쌓입니다.</div>`}
     <div class="card">
       <div class="flex-between"><h3>하이트래픽 TOP 3 <span class="sub">반응값 기준</span></h3>
       <button class="btn ghost sm" onclick="location.hash='tracking'">전체 보기 →</button></div>
       <div id="dashTop"></div>
     </div>`;
   areaLine($("#dashLine"), posts.map(engage), { labels: posts.map(p => whenLabel(p.at)) });
+  if (snaps.length >= 2) areaLine($("#snapLine"), snaps.map(s => s.followers), { h: 160, color: "var(--s-aqua)", labels: snaps.map(s => s.at.slice(5, 10).replace("-", "/")), tipLabel: "팔로워" });
   $("#dashTop").innerHTML = top.map((p, i) => {
     const mult = S.avgE ? engage(p) / S.avgE : 0, t = tierOf(mult);
     return `<div class="post-row">
@@ -819,32 +879,11 @@ function renderData() {
     } catch (e) { hvStatus("✕ 클립보드 복사 실패: " + e.message, "err"); }
   };
   const mergeHarvest = j => {
-    if (!Array.isArray(j.posts) || !j.posts.length) throw new Error("수집된 게시물이 0건입니다.");
-    let target = store.data.profiles.find(x => x.handle === j.handle);
-    if (!target) {
-      target = { id: uid(), name: j.name || j.handle, handle: j.handle, followers: j.followers || 0, posts: [] };
-      store.data.profiles.push(target);
-    } else {
-      if (j.name) target.name = j.name;
-      if (j.followers) target.followers = j.followers;
-    }
-    if (target.isDemo) { target.posts = []; target.isDemo = false; }
-    let added = 0, updated = 0;
-    j.posts.forEach(np => {
-      const ex = target.posts.find(x => x.tid === np.tid);
-      if (ex) {
-        ex.text = np.text; ex.at = np.at; ex.likes = np.likes; ex.replies = np.replies; ex.reposts = np.reposts; ex.shares = np.shares;
-        if (np.views) ex.views = np.views;
-        updated++;
-      } else { target.posts.push({ id: uid(), ...np }); added++; }
-    });
-    target.lastHarvest = j.harvestedAt || new Date().toISOString();
-    store.data.activeId = target.id;
-    store.save(); renderTopbar(); renderData();
-    $("#hvStatus").textContent = `✓ '${target.name}' 프로필로 가져왔습니다 — 새 글 ${added}건, 업데이트 ${updated}건`;
+    const r = importHarvestJSON(j);
+    renderTopbar(); renderData();
+    $("#hvStatus").textContent = `✓ '${r.target.name}' 프로필로 가져왔습니다 — 새 글 ${r.added}건, 업데이트 ${r.updated}건`;
     $("#hvStatus").style.color = "#3fc496";
   };
-  window.__mergeHarvest = mergeHarvest;
   $("#hvImport").onclick = async () => {
     /* 서버 폴더에 harvest.json이 있으면 그것부터, 없으면 파일 선택 */
     try {
@@ -972,12 +1011,117 @@ function renderData() {
   });
 }
 
+/* ============================== 계정 목록 ============================== */
+const CATEGORY_PRESETS = ["내 계정", "대행 고객", "벤치마킹", "지인", "미분류"];
+function renderAccounts() {
+  const el = $("#v-accounts");
+  const cats = {};
+  store.data.profiles.forEach(p => {
+    const c = p.category || (p.isDemo ? "데모" : "미분류");
+    (cats[c] = cats[c] || []).push(p);
+  });
+  const order = [...CATEGORY_PRESETS.filter(c => cats[c]), ...Object.keys(cats).filter(c => !CATEGORY_PRESETS.includes(c))];
+  el.innerHTML = vhead("Accounts", "계정 목록", "추적 중인 스레드 계정들입니다. 카테고리로 묶어서 관리하고, 카드를 누르면 그 계정의 리포트로 이동합니다.") + `
+    <div class="hint" style="margin-bottom:6px">➕ 새 계정 추가: 상단 입력창에 프로필 주소를 붙여넣고 [바로 분석]을 누르세요. · 데이터는 계정마다 따로 저장되고, 다시 수집하면 자동으로 병합·추적됩니다.</div>
+    ${order.map(cat => `
+      <div class="eyebrow" style="margin:26px 0 12px">${esc(cat)} <span style="color:var(--ink-3)">· ${cats[cat].length}</span></div>
+      <div class="grid g2">
+        ${cats[cat].map(p => {
+          const S = stats(p.posts);
+          const stale = p.lastHarvest && (Date.now() - new Date(p.lastHarvest)) > 7 * 864e5;
+          const active = p.id === store.data.activeId;
+          return `
+          <div class="card acct-card" data-id="${p.id}" style="cursor:pointer${active ? ";border-color:rgba(217,184,120,.45)" : ""}">
+            <div class="flex-between">
+              <div style="display:flex;gap:12px;align-items:center;min-width:0">
+                <div class="mini-av">${esc((p.name || "T").replace(/[^가-힣a-zA-Z]/g, "").charAt(0).toUpperCase() || "T")}</div>
+                <div style="min-width:0">
+                  <b style="font-size:14.5px">${esc(p.name)}</b>
+                  <div class="hint" style="margin-top:1px">${esc(p.handle || "핸들 미설정")}${p.followers ? " · 팔로워 " + fmtC(p.followers) : ""}</div>
+                </div>
+              </div>
+              ${active ? '<span class="tier t4">현재</span>' : ""}
+            </div>
+            <div class="hint" style="margin-top:12px">
+              글 ${fmtN(p.posts.length)}건 · 평균 반응값 ${fmtN(S.avgE)} ·
+              ${p.lastHarvest ? "수집 " + relTime(p.lastHarvest) : (p.isDemo ? "데모 데이터" : "수집 기록 없음")}
+              ${stale ? ' <b style="color:#c98500">— 7일 경과, 갱신 권장</b>' : ""}
+            </div>
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+              <button class="btn gold sm ac-open">리포트 열기</button>
+              <button class="btn ghost sm ac-track">⟳ 최신화</button>
+              <button class="btn ghost sm ac-cat">카테고리</button>
+              <button class="btn danger sm ac-del">삭제</button>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>`).join("")}`;
+
+  const openProfile = id => { store.data.activeId = id; store.save(); renderTopbar(); location.hash = "dashboard"; route(); };
+  $$(".acct-card", el).forEach(card => {
+    const id = card.dataset.id;
+    const p = store.data.profiles.find(x => x.id === id);
+    card.onclick = () => openProfile(id);
+    $(".ac-open", card).onclick = e => { e.stopPropagation(); openProfile(id); };
+    $(".ac-track", card).onclick = e => {
+      e.stopPropagation();
+      if (!p.handle) { alert("핸들이 없는 프로필입니다. 결과값 수집·관리에서 핸들을 먼저 저장해 주세요."); return; }
+      store.data.activeId = id; store.save(); renderTopbar();
+      wizOpen(p.handle);
+    };
+    $(".ac-cat", card).onclick = e => {
+      e.stopPropagation();
+      const c = prompt(`'${p.name}'의 카테고리를 입력하세요.\n추천: ${CATEGORY_PRESETS.join(" / ")}`, p.category || "미분류");
+      if (c === null) return;
+      p.category = c.trim() || "미분류";
+      store.save(); renderAccounts();
+    };
+    $(".ac-del", card).onclick = e => {
+      e.stopPropagation();
+      if (store.data.profiles.length <= 1) { alert("최소 1개 계정은 남아 있어야 합니다."); return; }
+      if (!confirm(`'${p.name}' 계정과 게시물 ${p.posts.length}건을 목록에서 삭제할까요?\n(이 브라우저에서만 지워집니다)`)) return;
+      store.data.profiles = store.data.profiles.filter(x => x.id !== id);
+      if (store.data.activeId === id) store.data.activeId = store.data.profiles[0].id;
+      store.save(); renderTopbar(); renderAccounts();
+    };
+  });
+}
+
+/* ============================== 바로 분석 마법사 ============================== */
+function wizOpen(handle) {
+  handle = handle.startsWith("@") ? handle : "@" + handle;
+  $("#wizHandle").textContent = handle;
+  $("#wizStatus").textContent = "";
+  $("#wizard").classList.add("on");
+  $("#wizOpen").onclick = () => window.open("https://www.threads.com/" + handle, "_blank");
+  const copy = () => navigator.clipboard.writeText(COLLECT_SCRIPT)
+    .then(() => { $("#wizCopyState").textContent = "✓ 클립보드에 복사됨"; $("#wizCopyState").style.color = "#3fc496"; })
+    .catch(() => { $("#wizCopyState").textContent = "복사 실패 — [다시 복사]를 눌러주세요"; $("#wizCopyState").style.color = "var(--s-red)"; });
+  $("#wizRecopy").onclick = copy;
+  copy();
+}
+function wizImportFile(f) {
+  if (!f) return;
+  f.text().then(txt => {
+    try {
+      const r = importHarvestJSON(JSON.parse(txt));
+      $("#wizard").classList.remove("on");
+      renderTopbar();
+      location.hash = "dashboard"; route();
+      $("#quickUrl").value = "";
+    } catch (e) {
+      $("#wizStatus").textContent = "✕ " + e.message;
+      $("#wizStatus").style.color = "var(--s-red)";
+    }
+  });
+}
+
 /* ============================== 상단바 & 라우터 ============================== */
 function renderTopbar() {
   const P = store.profile();
   $("#acctAvatar").textContent = (P.name || "T").replace(/[^가-힣a-zA-Z]/g, "").charAt(0).toUpperCase() || "T";
   $("#acctName").textContent = P.name;
-  $("#acctMeta").innerHTML = `${esc(P.handle || "")} ${P.followers ? `· 팔로워 <b>${fmtC(P.followers)}</b>` : ""} · 게시물 ${P.posts.length}건`;
+  $("#acctMeta").innerHTML = `${esc(P.handle || "")} ${P.followers ? `· 팔로워 <b>${fmtC(P.followers)}</b>` : ""} · 게시물 ${P.posts.length}건${P.lastHarvest ? ` · 수집 ${relTime(P.lastHarvest)}` : ""}`;
   $("#demoBadge").style.display = P.isDemo ? "" : "none";
   const sel = $("#profileSel");
   sel.innerHTML = store.data.profiles.map(p => `<option value="${p.id}" ${p.id === store.data.activeId ? "selected" : ""}>${esc(p.name)}</option>`).join("");
@@ -987,7 +1131,7 @@ $("#profileSel").onchange = e => {
   renderTopbar(); route();
 };
 
-const RENDER = { dashboard: renderDashboard, tracking: renderTracking, predict: renderPredict, timing: renderTiming, persona: renderPersona, benchmark: renderBenchmark, data: renderData };
+const RENDER = { dashboard: renderDashboard, accounts: renderAccounts, tracking: renderTracking, predict: renderPredict, timing: renderTiming, persona: renderPersona, benchmark: renderBenchmark, data: renderData };
 function route() {
   const v = location.hash.replace("#", "") || "dashboard";
   const view = RENDER[v] ? v : "dashboard";
@@ -995,9 +1139,57 @@ function route() {
   $$("#nav a").forEach(a => a.classList.toggle("active", a.dataset.v === view));
   RENDER[view]();
   $("#v-" + view).classList.add("on");
-  window.scrollTo({ top: 0 });
+  /* 모바일에선 메뉴가 위에 있어서, 화면 전환 시 콘텐츠 시작점으로 스크롤해야 "바뀐 게" 보인다 */
+  if (innerWidth <= 1000) setTimeout(() => $("#v-" + view).scrollIntoView({ block: "start" }), 40);
+  else window.scrollTo({ top: 0 });
 }
 window.addEventListener("hashchange", route);
+
+/* ---------- 바로 분석 · 로고 홈 · 파일 드롭 ---------- */
+function quickAnalyze() {
+  const v = $("#quickUrl").value.trim();
+  const m = v.match(/@[A-Za-z0-9._]+/) || (v && !/[\/\s]/.test(v) ? ["@" + v.replace(/^@/, "")] : null);
+  if (!m) { alert("스레드 프로필 주소(threads.com/@아이디) 또는 @핸들을 붙여넣어 주세요."); return; }
+  const handle = m[0];
+  const existing = store.data.profiles.find(p => p.handle === handle && p.posts.length && !p.isDemo);
+  if (existing) {
+    store.data.activeId = existing.id; store.save(); renderTopbar();
+    location.hash = "dashboard"; route();
+    if (confirm(`'${existing.name}'은(는) 이미 추적 중인 계정입니다 (글 ${existing.posts.length}건).\n최신 데이터로 갱신할까요?`)) wizOpen(handle);
+    return;
+  }
+  wizOpen(handle);
+}
+$("#quickGo").onclick = quickAnalyze;
+$("#quickUrl").addEventListener("keydown", e => { if (e.key === "Enter") quickAnalyze(); });
+$("#wizClose").onclick = () => $("#wizard").classList.remove("on");
+$("#wizard").addEventListener("click", e => { if (e.target.id === "wizard") $("#wizard").classList.remove("on"); });
+$("#wizDrop").onclick = () => $("#wizFile").click();
+$("#wizFile").onchange = e => { wizImportFile(e.target.files[0]); e.target.value = ""; };
+$("#wizDrop").addEventListener("dragover", e => { e.preventDefault(); $("#wizDrop").classList.add("hover"); });
+$("#wizDrop").addEventListener("dragleave", () => $("#wizDrop").classList.remove("hover"));
+$("#wizDrop").addEventListener("drop", e => {
+  e.preventDefault(); $("#wizDrop").classList.remove("hover");
+  wizImportFile(e.dataTransfer.files[0]);
+});
+/* 앱 어디에나 harvest JSON을 떨어뜨리면 가져오기 */
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => {
+  e.preventDefault();
+  const f = e.dataTransfer?.files?.[0];
+  if (f && f.name.endsWith(".json")) {
+    f.text().then(txt => {
+      try { importHarvestJSON(JSON.parse(txt)); renderTopbar(); location.hash = "dashboard"; route(); }
+      catch (err) { alert("가져오기 실패: " + err.message); }
+    });
+  }
+});
+/* 로고·프로필 클릭 → 홈 */
+const goHome = () => { location.hash = "dashboard"; route(); };
+$(".brand").style.cursor = "pointer";
+$(".brand").onclick = goHome;
+$(".acct").style.cursor = "pointer";
+$(".acct").onclick = goHome;
 
 store.load();
 renderTopbar();

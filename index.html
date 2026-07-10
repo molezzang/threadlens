@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>THREADLENS — 스레드 트래픽의 본질</title>
+<meta name="description" content="스레드(Threads) 트래픽 분석 도구. 우상향 리포트, 발행 전 로직 점검, 트래픽 골든타임, 반응층 분석, 하이트래픽 글 구조 벤치마킹 — 회원가입 없이 무료, 데이터는 내 브라우저에만 저장.">
+<meta property="og:title" content="THREADLENS — 스레드 트래픽의 본질">
+<meta property="og:description" content="결과값에는 이유가 있습니다. 감이 아니라 데이터로 스레드를 키우는 무료 분석 도구.">
+<meta property="og:type" content="website">
+<!-- ▼ 애드센스 승인 후: 아래 주석을 풀고 ca-pub 값을 본인 ID로 교체하세요 -->
+<!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script> -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700;900&display=swap" rel="stylesheet">
 <style>
@@ -260,6 +266,49 @@ table.data tr:hover td{background:rgba(255,255,255,.02)}
 .flex-between{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .mt8{margin-top:8px}.mt16{margin-top:16px}.mt24{margin-top:24px}
 
+/* analyze bar */
+.analyze-bar{
+  display:flex;gap:10px;align-items:center;margin-bottom:28px;
+  background:linear-gradient(180deg,rgba(217,184,120,.06),rgba(217,184,120,.02)),var(--surface);
+  border:1px solid rgba(217,184,120,.28);border-radius:14px;padding:10px 12px;
+}
+.analyze-bar .ab-ico{font-size:16px;padding-left:4px}
+.analyze-bar input{flex:1;background:transparent;border:none;border-radius:0;padding:8px 6px;min-width:0}
+.analyze-bar input:focus{border:none;outline:none}
+.analyze-bar .btn{flex-shrink:0;white-space:nowrap}
+
+/* modal / wizard */
+.modal-back{
+  position:fixed;inset:0;z-index:100;background:rgba(6,8,12,.72);backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;padding:18px;
+}
+.modal-back.on{display:flex}
+.modal{
+  width:100%;max-width:520px;max-height:88vh;overflow-y:auto;
+  background:var(--surface);border:1px solid rgba(217,184,120,.3);border-radius:18px;padding:24px;
+  box-shadow:0 24px 80px rgba(0,0,0,.6);animation:rise .25s ease;
+}
+.wiz-steps{margin:16px 0 4px;padding-left:22px;display:flex;flex-direction:column;gap:11px}
+.wiz-steps li{font-size:13.5px;color:var(--ink-2);line-height:1.6}
+.wiz-steps b{color:var(--ink)}
+.wiz-steps code{background:var(--surface-3);padding:1px 6px;border-radius:5px;font-size:11.5px;color:var(--gold-2)}
+.dropzone{
+  margin-top:16px;border:1.5px dashed rgba(217,184,120,.4);border-radius:14px;
+  padding:26px 16px;text-align:center;font-size:13.5px;color:var(--ink-2);cursor:pointer;
+  transition:all .15s;line-height:1.7;
+}
+.dropzone span{font-size:12px;color:var(--ink-3)}
+.dropzone.hover,.dropzone:hover{background:rgba(217,184,120,.07);border-color:var(--gold)}
+
+/* accounts */
+.acct-card{transition:transform .15s, border-color .15s}
+.acct-card:hover{transform:translateY(-2px);border-color:rgba(217,184,120,.35)}
+.mini-av{
+  width:38px;height:38px;border-radius:50%;background:var(--gold-grad);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--serif);font-weight:900;font-size:15px;color:#1a1408;
+}
+
 /* benchmark structure */
 .bm-part{border-left:2px solid var(--s-blue);padding:10px 14px;margin-top:12px;background:var(--surface-2);border-radius:0 10px 10px 0}
 .bm-part .bp-tag{font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--s-blue);font-weight:700}
@@ -293,6 +342,7 @@ table.data tr:hover td{background:rgba(255,255,255,.02)}
     </div>
     <nav class="nav" id="nav">
       <a href="#dashboard" data-v="dashboard"><span class="ico">◈</span>우상향 리포트</a>
+      <a href="#accounts" data-v="accounts"><span class="ico">📇</span>계정 목록</a>
       <div class="sep">Traffic</div>
       <a href="#tracking" data-v="tracking"><span class="ico">📈</span>결과값 추적</a>
       <a href="#predict" data-v="predict"><span class="ico">🧭</span>발행 전 로직 점검</a>
@@ -301,9 +351,12 @@ table.data tr:hover td{background:rgba(255,255,255,.02)}
       <div class="sep">Weapon</div>
       <a href="#benchmark" data-v="benchmark"><span class="ico">🔍</span>하이트래픽 벤치마킹</a>
       <a href="#data" data-v="data"><span class="ico">🗂</span>결과값 수집·관리</a>
+      <div class="sep">Learn</div>
+      <a href="./guide.html"><span class="ico">📖</span>스레드 성장 가이드</a>
     </nav>
     <div class="side-foot">
       모든 데이터는 이 브라우저에만<br>저장됩니다 (localStorage)
+      <div style="margin-top:10px"><a href="./privacy.html" style="color:var(--ink-3)">개인정보처리방침</a> · <a href="mailto:molezzang@gmail.com" style="color:var(--ink-3)">문의</a></div>
     </div>
   </aside>
 
@@ -322,6 +375,13 @@ table.data tr:hover td{background:rgba(255,255,255,.02)}
       </div>
     </div>
 
+    <div class="analyze-bar">
+      <span class="ab-ico">⚡</span>
+      <input id="quickUrl" type="text" placeholder="분석할 스레드 프로필 주소 붙여넣기 · 예) threads.com/@handle 또는 @handle" enterkeyhint="go">
+      <button class="btn gold" id="quickGo">바로 분석</button>
+    </div>
+
+    <section class="view" id="v-accounts"></section>
     <section class="view" id="v-dashboard"></section>
     <section class="view" id="v-tracking"></section>
     <section class="view" id="v-predict"></section>
@@ -332,6 +392,26 @@ table.data tr:hover td{background:rgba(255,255,255,.02)}
   </main>
 </div>
 <div class="tooltip" id="tooltip"></div>
+
+<div class="modal-back" id="wizard">
+  <div class="modal">
+    <div class="flex-between">
+      <h3 style="font-size:16px">⚡ <span id="wizHandle" style="color:var(--gold-2)"></span> 바로 분석</h3>
+      <button class="del-x" id="wizClose" style="font-size:18px">✕</button>
+    </div>
+    <ol class="wiz-steps">
+      <li><b>수집 스크립트</b> — <span id="wizCopyState">준비 중…</span> <button class="btn ghost sm" id="wizRecopy">다시 복사</button></li>
+      <li><button class="btn gold sm" id="wizOpen">프로필 새 탭에서 열기 ↗</button> <span style="font-size:12px;color:var(--ink-3)">(PC 브라우저 권장)</span></li>
+      <li>새 탭에서 <b>F12 → Console</b> 탭 → 붙여넣기 + <b>Enter</b><br><span style="font-size:12px;color:var(--ink-3)">크롬이 막으면 콘솔에 allow pasting 이라고 먼저 입력 · 빨간 경고는 무시해도 됩니다 (읽기 전용 스크립트)</span></li>
+      <li>자동 스크롤이 끝나면 <code>threadlens-harvest.json</code>이 다운로드됩니다</li>
+    </ol>
+    <div class="dropzone" id="wizDrop">📥 다운로드된 파일을 여기에 끌어다 놓기<br><span>또는 클릭해서 파일 선택</span></div>
+    <input type="file" id="wizFile" accept=".json" style="display:none">
+    <div class="hint" id="wizStatus"></div>
+    <div class="hint" style="margin-top:10px">📱 폰에서는 3번 단계가 안 되므로, PC에서 받은 JSON 파일을 위 영역으로 불러오세요.</div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 </body>
 </html>
