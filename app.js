@@ -1160,6 +1160,8 @@ function quickAnalyze() {
   }
   wizOpen(handle);
 }
+/* 아래 바인딩 중 하나가 실패해도(구버전 HTML 캐시 등) 앱 부팅은 계속되도록 격리 */
+try {
 $("#quickGo").onclick = quickAnalyze;
 $("#quickUrl").addEventListener("keydown", e => { if (e.key === "Enter") quickAnalyze(); });
 $("#wizClose").onclick = () => $("#wizard").classList.remove("on");
@@ -1197,6 +1199,7 @@ $(".brand").style.cursor = "pointer";
 $(".brand").onclick = goHome;
 $(".acct").style.cursor = "pointer";
 $(".acct").onclick = goHome;
+} catch (e) { console.warn("[THREADLENS] 일부 UI 바인딩 실패 (새로고침 권장):", e); }
 
 store.load();
 renderTopbar();
