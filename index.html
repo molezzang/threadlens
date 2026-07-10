@@ -405,10 +405,16 @@ table.data tr:hover td{background:rgba(255,255,255,.02)}
       <li>새 탭에서 <b>F12 → Console</b> 탭 → 붙여넣기 + <b>Enter</b><br><span style="font-size:12px;color:var(--ink-3)">크롬이 막으면 콘솔에 allow pasting 이라고 먼저 입력 · 빨간 경고는 무시해도 됩니다 (읽기 전용 스크립트)</span></li>
       <li>자동 스크롤이 끝나면 <code>threadlens-harvest.json</code>이 다운로드됩니다</li>
     </ol>
+    <div class="hint" style="margin-top:14px;padding:12px 14px;border:1px dashed rgba(217,184,120,.4);border-radius:10px">
+      🔖 <b style="color:var(--gold-2)">콘솔(F12)이 어렵다면 — 북마클릿 (한 번만 설정)</b><br>
+      아래 금색 버튼을 <b>브라우저 북마크바로 드래그</b>해서 저장해 두세요. 다음부터는 아무 프로필에서나 그 북마크를 <b>클릭 한 번</b>이면 수집이 시작됩니다. F12도, allow pasting도 필요 없습니다.<br>
+      <span style="font-size:11.5px">※ 북마크바가 안 보이면 Ctrl+Shift+B</span>
+      <div style="margin-top:10px"><a id="bmkLink" class="btn gold sm" href="#" draggable="true">🧲 THREADLENS 수집</a></div>
+    </div>
     <div class="dropzone" id="wizDrop">📥 다운로드된 파일을 여기에 끌어다 놓기<br><span>또는 클릭해서 파일 선택</span></div>
     <input type="file" id="wizFile" accept=".json" style="display:none">
     <div class="hint" id="wizStatus"></div>
-    <div class="hint" style="margin-top:10px">📱 폰에서는 3번 단계가 안 되므로, PC에서 받은 JSON 파일을 위 영역으로 불러오세요.</div>
+    <div class="hint" style="margin-top:10px">📱 폰에서는 수집이 안 되므로, PC에서 받은 JSON 파일을 위 영역으로 불러오세요.</div>
   </div>
 </div>
 

@@ -1184,6 +1184,13 @@ window.addEventListener("drop", e => {
     });
   }
 });
+/* 북마클릿: 콘솔 없이 수집 — 북마크바로 드래그해 두고 프로필에서 클릭 */
+const bmk = $("#bmkLink");
+bmk.href = "javascript:" + encodeURIComponent("void " + COLLECT_SCRIPT);
+bmk.onclick = e => {
+  e.preventDefault();
+  alert("이 버튼은 '클릭'이 아니라 브라우저 상단 북마크바로 '드래그'해서 저장하는 버튼입니다.\n\n저장해 두면 threads.com 프로필 화면에서 그 북마크를 누르는 것만으로 수집이 시작됩니다.");
+};
 /* 로고·프로필 클릭 → 홈 */
 const goHome = () => { location.hash = "dashboard"; route(); };
 $(".brand").style.cursor = "pointer";
