@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>스레드렌즈 — 소재만 넣으면 터지는 글 구조를 골라드립니다</title>
+<meta name="description" content="소상공인·자영업자를 위한 스레드 글 구조 모음. 내 업종과 소재만 넣으면 72가지 구조 중 맞는 것을 골라 바로 쓸 수 있는 프롬프트로 만들어 드립니다.">
+<meta name="theme-color" content="#11141c">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="wrap">
+  <section class="hero">
+    <h1>소재만 넣으세요.<br><em>터지는 글 구조</em>는 골라드립니다.</h1>
+    <p>사장님 가게를 알리는 스레드 글, 세 가지만 고르면 됩니다.</p>
+  </section>
+
+  <section class="step" aria-labelledby="s1">
+    <div class="step-h"><span class="num">1</span><h2 id="s1">내 업종을 고르세요</h2></div>
+    <div id="cats" class="cats"></div>
+    <div id="picked" class="picked" hidden></div>
+  </section>
+
+  <section class="step" aria-labelledby="s2">
+    <div class="step-h"><span class="num">2</span><h2 id="s2">오늘 쓸 소재를 적으세요</h2></div>
+    <p class="hint">오늘 있었던 일, 알리고 싶은 것, 뭐든 한두 줄이면 됩니다.</p>
+    <textarea id="material" placeholder="예) 새벽 5시에 나와서 직접 굽는 소금빵" aria-labelledby="s2"></textarea>
+    <div id="examples" class="chips" aria-label="예시 소재"></div>
+    <div id="pin" class="pin" hidden></div>
+  </section>
+
+  <section class="step" aria-labelledby="s3">
+    <div class="step-h"><span class="num">3</span><h2 id="s3">무엇을 바라세요?</h2></div>
+    <div id="goals" class="goals">
+      <button type="button" class="goal on" data-g="v">많이 보게<small>조회수</small></button>
+      <button type="button" class="goal" data-g="c">댓글 달리게<small>소통</small></button>
+      <button type="button" class="goal" data-g="s">가게로 오게<small>방문·예약</small></button>
+    </div>
+  </section>
+
+  <div class="stack">
+    <button type="button" id="make" class="btn gold">글 만들기</button>
+  </div>
+
+  <section id="result" class="result" hidden aria-live="polite"></section>
+
+  <p class="note" id="toneNote"></p>
+</main>
+
+<script src="assets/config.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  var T = TL, $ = T.$, esc = T.esc;
+  T.chrome('make');
+
+  var state = { cat: T.param('c') || T.store.get('cat', ''), goal: 'v', pin: T.param('s'), ranked: [], idx: 0 };
+  if (!T.cat(state.cat)) state.cat = '';
+  var pinned = state.pin ? T.struct(state.pin) : null;
+
+  /* 1. 업종 */
+  function drawCats() {
+    var box = $('#cats'), picked = $('#picked'), c = T.cat(state.cat);
+    if (c) {
+      box.hidden = true; picked.hidden = false;
+      picked.innerHTML = '<b>' + c.icon + ' ' + esc(c.name) + '</b><button type="button" class="linkbtn" id="change">바꾸기</button>';
+      $('#change').onclick = function () { state.cat = ''; drawCats(); };
+    } else {
+      picked.hidden = true; box.hidden = false;
+      box.innerHTML = CATS.map(function (c) {
+        return '<button type="button" class="cat" data-id="' + c.id + '"><span class="ic" aria-hidden="true">' + c.icon + '</span>' + esc(c.name) + '</button>';
+      }).join('');
+      T.$all('.cat', box).forEach(function (b) {
+        b.onclick = function () { state.cat = b.dataset.id; T.store.set('cat', state.cat); drawCats(); $('#material').focus(); };
+      });
+    }
+    drawExamples();
+  }
+
+  /* 2. 예시 소재 */
+  function drawExamples() {
+    var c = T.cat(state.cat), box = $('#examples');
+    if (!c) { box.innerHTML = ''; return; }
+    $('#material').placeholder = '예) ' + c.ex[0];
+    box.innerHTML = c.ex.map(function (e) { return '<button type="button" class="chip">' + esc(e) + '</button>'; }).join('');
+    T.$all('.chip', box).forEach(function (b) { b.onclick = function () { $('#material').value = b.textContent; }; });
+  }
+
+  /* 구조를 직접 골라서 온 경우 */
+  function drawPin() {
+    var p = $('#pin');
+    if (!pinned) { p.hidden = true; return; }
+    p.hidden = false;
+    p.innerHTML = '<span>고른 구조: <b>' + esc(pinned.n) + '</b></span><button type="button" class="linkbtn" id="unpin">자동 추천으로</button>';
+    $('#unpin').onclick = function () { pinned = null; drawPin(); };
+  }
+
+  /* 3. 목표 */
+  T.$all('.goal').forEach(function (b) {
+    b.onclick = function () { T.$all('.goal').forEach(function (x) { x.classList.remove('on'); }); b.classList.add('on'); state.goal = b.dataset.g; };
+  });
+
+  /* 글 만들기 */
+  $('#make').onclick = function () {
+    var c = T.cat(state.cat), m = $('#material').value.trim();
+    if (!c) { T.toast('1번에서 업종을 먼저 골라 주세요'); $('#s1').scrollIntoView({ block: 'center' }); return; }
+    if (m.length < 4) { T.toast('2번에 소재를 한 줄 적어 주세요'); $('#material').focus(); return; }
+    state.ranked = T.rank(m, state.goal).slice(0, 10);
+    if (pinned) {
+      state.ranked = [{ s: pinned, hits: [], pinned: true }].concat(state.ranked.filter(function (r) { return r.s.id !== pinned.id; })).slice(0, 10);
+    }
+    state.idx = 0;
+    show(true);
+  };
+
+  function reasonText(r) {
+    if (r.pinned) return '사장님이 직접 고른 구조입니다.';
+    var goalName = { v: '많이 보게', c: '댓글 달리게', s: '가게로 오게' }[state.goal];
+    if (r.hits.length) return '소재에 “' + r.hits[0].trim() + '” 이야기가 있어서 이 구조가 잘 맞습니다.';
+    if (r.s.goals.indexOf(state.goal) > -1) return '“' + goalName + '” 목표에 잘 맞는 구조입니다.';
+    return '어떤 소재에도 무난하게 쓸 수 있는 구조입니다.';
+  }
+
+  function show(scroll) {
+    var c = T.cat(state.cat), m = $('#material').value.trim(), r = state.ranked[state.idx], s = r.s;
+    var live = !!T.apiUrl();
+    var prompt = T.buildPrompt(c, s, m, state.goal);
+    var box = $('#result');
+    box.hidden = false;
+    box.innerHTML =
+      '<div class="result-top"><span class="tag">' + STRUCTS.length + '개 구조 중 ' + (state.idx + 1) + '순위</span>' +
+      '<h2>' + esc(s.n) + '</h2><p>' + esc(s.why) + '</p></div>' +
+      '<div class="result-body">' +
+        (live ? '<div id="post" class="post" aria-live="polite"></div>' : '') +
+        '<p class="reason">' + esc(reasonText(r)) + '</p>' +
+        '<ol class="flow">' + s.flow.map(function (f) { return '<li>' + esc(T.fill(f, c)) + '</li>'; }).join('') + '</ol>' +
+        '<div class="stack">' +
+          '<a class="btn ' + (live ? 'sm' : 'primary') + '" id="gpt" target="_blank" rel="noopener" href="' + esc(T.aiUrl('gpt', prompt)) + '">ChatGPT에서 글 받기</a>' +
+          '<div class="row2"><button type="button" class="btn sm" id="cp">프롬프트 복사</button>' +
+          '<button type="button" class="btn sm" id="next">다른 구조로</button></div>' +
+        '</div>' +
+        '<p class="howto">' + (live ? '글이 마음에 안 들면 “다시 쓰기”나 “다른 구조로”를 눌러 보세요. 올리기 전에 사실과 다른 내용이 없는지 꼭 읽어 보세요.'
+          : 'ChatGPT 버튼을 누르면 ChatGPT가 열리고 글이 써집니다. 안 써지면 입력칸에 붙여넣기 하세요. 프롬프트는 이미 복사해 두었습니다.') + '</p>' +
+        '<details><summary>만들어진 프롬프트 보기</summary><pre class="prompt">' + esc(prompt) + '</pre>' +
+        '<div style="padding:0 16px 16px"><a class="btn sm" target="_blank" rel="noopener" href="' + esc(T.aiUrl('claude', prompt)) + '">Claude에서 글 받기</a></div></details>' +
+        '<div class="stack"><a class="btn sm" href="category.html?c=' + c.id + '">' + esc(c.name) + ' 구조 ' + STRUCTS.length + '개 전부 보기</a></div>' +
+      '</div>';
+    $('#gpt').onclick = function () { T.copy(prompt, '프롬프트를 복사하고 ChatGPT를 엽니다'); };
+    $('#cp').onclick = function () { T.copy(prompt, '복사했어요. AI에 붙여넣기 하세요'); };
+    $('#next').onclick = function () { state.idx = (state.idx + 1) % state.ranked.length; show(true); };
+    if (scroll) box.scrollIntoView({ block: 'start' });
+    if (live) write(c, s, m);
+  }
+
+  /* 사이트 안에서 바로 글 받기 */
+  var writing = 0;
+  function write(c, s, m) {
+    var post = $('#post'), ticket = ++writing;
+    post.innerHTML = '<p class="post-wait">글을 쓰고 있어요. 10초쯤 걸립니다…</p>';
+    T.generate(T.buildPrompt(c, s, m, state.goal, true)).then(function (text) {
+      if (ticket !== writing || !$('#post')) return;
+      post.innerHTML = '<p class="post-text"></p><div class="stack">' +
+        '<button type="button" class="btn primary" id="cpPost">글 복사하기</button>' +
+        '<div class="row2"><a class="btn sm" target="_blank" rel="noopener" href="https://www.threads.com/">스레드 열기</a>' +
+        '<button type="button" class="btn sm" id="again">다시 쓰기</button></div></div>';
+      $('.post-text', post).textContent = text;
+      $('#cpPost').onclick = function () { T.copy(text, '복사했어요. 스레드에 붙여넣기 하세요'); };
+      $('#again').onclick = function () { write(c, s, m); };
+    }, function (e) {
+      if (ticket !== writing || !$('#post')) return;
+      post.innerHTML = '<p class="post-err"></p><div class="stack"><button type="button" class="btn sm" id="again">다시 해보기</button></div>';
+      $('.post-err', post).textContent = e.message;
+      $('#again').onclick = function () { write(c, s, m); };
+    });
+  }
+
+  /* 말투 안내 */
+  var t = T.tone();
+  $('#toneNote').innerHTML = t
+    ? '<b>내 말투가 저장되어 있습니다.</b> 만드는 글마다 자동으로 들어갑니다. <a href="tone.html">말투 고치기</a>'
+    : '<b>내 말투를 저장해 두세요.</b> 한 번만 적어 두면 모든 글이 사장님 말투로 나옵니다. <a href="tone.html">말투 저장하러 가기</a>';
+
+  drawCats(); drawPin();
+  if (T.param('m')) $('#material').value = T.param('m');
+})();
+</script>
+</body>
+</html>

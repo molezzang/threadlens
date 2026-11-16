@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>내 말투 저장 — 스레드렌즈</title>
+<meta name="description" content="내 말투를 한 번 저장해 두면 스레드렌즈가 만드는 모든 글에 자동으로 들어갑니다.">
+<meta name="theme-color" content="#11141c">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="wrap">
+  <div class="page-h">
+    <h1>내 말투 저장</h1>
+    <p>한 번만 적어 두면, 만드는 글마다 사장님 말투로 나옵니다. 다 안 채워도 됩니다.</p>
+  </div>
+
+  <label class="lb" for="name">가게 이름 <small>안 적어도 됩니다</small></label>
+  <input type="text" id="name" placeholder="예) 순천 달빛카페" maxlength="40">
+
+  <label class="lb" for="intro">한 줄 소개 <small>어디서 무엇을 하는지</small></label>
+  <input type="text" id="intro" placeholder="예) 순천에서 7년째 혼자 하는 동네 카페" maxlength="80">
+
+  <label class="lb" id="styleLb">말투 고르기</label>
+  <div class="chips" id="styles" role="group" aria-labelledby="styleLb"></div>
+
+  <label class="lb" for="sample">내가 쓴 글 붙여넣기 <small>가장 효과가 큽니다</small></label>
+  <p class="hint" style="margin-top:0">평소에 쓴 스레드 글, 문자, 블로그 글 아무거나 2~3개 붙여넣으세요. 그 말투를 그대로 따라 씁니다.</p>
+  <textarea id="sample" style="min-height:200px" maxlength="1500" placeholder="여기에 내가 쓴 글을 붙여넣으세요"></textarea>
+
+  <label class="lb" for="likes">자주 쓰는 말 <small>안 적어도 됩니다</small></label>
+  <input type="text" id="likes" placeholder="예) ~했어요, 진짜, 사실은" maxlength="80">
+
+  <label class="lb" for="bans">절대 안 쓰는 말 <small>안 적어도 됩니다</small></label>
+  <input type="text" id="bans" placeholder="예) 대박, 꿀팁, 느낌표 여러 개" maxlength="80">
+
+  <div class="stack" style="margin-top:28px">
+    <button type="button" class="btn gold" id="save">저장하기</button>
+    <a class="btn" href="index.html">글 만들러 가기</a>
+    <button type="button" class="linkbtn" id="clear">저장한 말투 지우기</button>
+  </div>
+  <p class="saved" id="saved" role="status">저장했습니다. 이제 만드는 글마다 이 말투가 들어갑니다.</p>
+
+  <p class="note">말투는 <b>지금 쓰는 휴대폰·컴퓨터에만</b> 저장됩니다. 다른 기기에서는 다시 적어 주세요.</p>
+</main>
+
+<script src="assets/config.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  var T = TL, $ = T.$;
+  T.chrome('tone');
+  var t = T.tone() || {}, style = t.style || '';
+  var fields = ['name', 'intro', 'sample', 'likes', 'bans'];
+  fields.forEach(function (f) { $('#' + f).value = t[f] || ''; });
+
+  function drawStyles() {
+    $('#styles').innerHTML = T.TONE_STYLES.map(function (s) {
+      return '<button type="button" class="chip' + (s === style ? ' on' : '') + '" aria-pressed="' + (s === style) + '">' + s + '</button>';
+    }).join('');
+    T.$all('#styles .chip').forEach(function (b) {
+      b.onclick = function () { style = (style === b.textContent) ? '' : b.textContent; drawStyles(); };
+    });
+  }
+  drawStyles();
+
+  $('#save').onclick = function () {
+    var o = { style: style };
+    fields.forEach(function (f) { o[f] = $('#' + f).value.trim(); });
+    $('#saved').classList.add('show');
+    if (T.store.set('tone', o)) T.toast('저장했어요');
+    else T.toast('이번 방문 동안만 기억해요. 다음에 다시 적어 주세요');
+  };
+  $('#clear').onclick = function () {
+    T.store.del('tone');
+    fields.forEach(function (f) { $('#' + f).value = ''; });
+    style = ''; drawStyles(); $('#saved').classList.remove('show'); T.toast('지웠어요');
+  };
+})();
+</script>
+</body>
+</html>
