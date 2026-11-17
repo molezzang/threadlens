@@ -40,6 +40,23 @@
     <p class="hint">오늘 있었던 일, 알리고 싶은 것, 뭐든 한두 줄이면 됩니다.</p>
     <textarea id="material" placeholder="예) 새벽 5시에 나와서 직접 굽는 소금빵" aria-labelledby="s2"></textarea>
     <div id="examples" class="chips" aria-label="예시 소재"></div>
+    <details class="mine" id="mine">
+      <summary>소재가 안 떠오르면, 내 자료에서 뽑기</summary>
+      <div class="mine-in">
+        <p class="hint">가게 소개글, 메뉴판, 손님 후기, 블로그 글을 넣으면 쓸 만한 소재 10개를 뽑아 줍니다.</p>
+        <label class="lb" for="info">글로 된 자료 <small>붙여넣기</small></label>
+        <textarea id="info" maxlength="6000" placeholder="가게 소개, 메뉴와 가격, 손님 후기 등을 붙여넣으세요"></textarea>
+        <input type="file" id="infoFile" accept=".txt,.md,.csv,text/plain,text/markdown,text/csv" hidden>
+        <div class="stack"><button type="button" class="btn sm" id="infoPick">글 파일 불러오기 (txt)</button></div>
+        <p class="mine-tip"><b>캡처·사진·PDF</b>는 제미나이가 열리면 입력칸 옆 <b>＋</b> 버튼으로 함께 올려 주세요.</p>
+        <div class="stack"><a class="btn primary" id="mineGo" target="_blank" rel="noopener" href="https://gemini.google.com/app">제미나이에서 소재 뽑기</a></div>
+        <ol class="flow">
+          <li>제미나이가 열리면 입력칸을 길게 눌러 <b>붙여넣기</b></li>
+          <li>캡처나 사진이 있으면 ＋ 버튼으로 올리고 보내기</li>
+          <li>나온 소재 하나를 복사해 위 2번 칸에 붙여넣기</li>
+        </ol>
+      </div>
+    </details>
     <div id="pin" class="pin" hidden></div>
   </section>
 
@@ -150,17 +167,17 @@
         '<p class="reason">' + esc(reasonText(r)) + '</p>' +
         '<ol class="flow">' + s.flow.map(function (f) { return '<li>' + esc(T.fill(f, c)) + '</li>'; }).join('') + '</ol>' +
         '<div class="stack">' +
-          '<a class="btn ' + (live ? 'sm' : 'primary') + '" id="gpt" target="_blank" rel="noopener" href="' + esc(T.aiUrl('gpt', prompt)) + '">ChatGPT에서 글 받기</a>' +
+          '<a class="btn ' + (live ? 'sm' : 'primary') + '" id="gem" target="_blank" rel="noopener" href="' + T.GEMINI + '">제미나이에서 글 받기</a>' +
           '<div class="row2"><button type="button" class="btn sm" id="cp">프롬프트 복사</button>' +
           '<button type="button" class="btn sm" id="next">다른 구조로</button></div>' +
         '</div>' +
         '<p class="howto">' + (live ? '글이 마음에 안 들면 “다시 쓰기”나 “다른 구조로”를 눌러 보세요. 올리기 전에 사실과 다른 내용이 없는지 꼭 읽어 보세요.'
-          : 'ChatGPT 버튼을 누르면 ChatGPT가 열리고 글이 써집니다. 안 써지면 입력칸에 붙여넣기 하세요. 프롬프트는 이미 복사해 두었습니다.') + '</p>' +
-        '<details><summary>만들어진 프롬프트 보기</summary><pre class="prompt">' + esc(prompt) + '</pre>' +
-        '<div style="padding:0 16px 16px"><a class="btn sm" target="_blank" rel="noopener" href="' + esc(T.aiUrl('claude', prompt)) + '">Claude에서 글 받기</a></div></details>' +
+          : '제미나이 버튼을 누르면 프롬프트가 복사되고 제미나이가 열립니다.') + '</p>' +
+        (live ? '' : '<ol class="flow"><li>제미나이가 열리면 입력칸을 길게 눌러 <b>붙여넣기</b></li><li>보내기(▶)를 누르면 글이 나옵니다</li><li>글을 복사해 스레드에 올리기</li></ol>') +
+        '<details><summary>만들어진 프롬프트 보기</summary><pre class="prompt">' + esc(prompt) + '</pre></details>' +
         '<div class="stack"><a class="btn sm" href="category.html?c=' + c.id + '">' + esc(c.name) + ' 구조 ' + STRUCTS.length + '개 전부 보기</a></div>' +
       '</div>';
-    $('#gpt').onclick = function () { T.copy(prompt, '프롬프트를 복사하고 ChatGPT를 엽니다'); };
+    $('#gem').onclick = function () { T.copy(prompt, '복사했어요. 제미나이에 붙여넣기 하세요'); };
     $('#cp').onclick = function () { T.copy(prompt, '복사했어요. AI에 붙여넣기 하세요'); };
     $('#next').onclick = function () { state.idx = (state.idx + 1) % state.ranked.length; show(true); };
     if (scroll) box.scrollIntoView({ block: 'start' });
@@ -188,6 +205,27 @@
       $('#again').onclick = function () { write(c, s, m); };
     });
   }
+
+  /* 내 자료에서 소재 뽑기 */
+  $('#info').value = T.store.get('info', '');
+  $('#info').oninput = function () { T.store.set('info', $('#info').value); };
+  $('#infoPick').onclick = function () { $('#infoFile').click(); };
+  $('#infoFile').onchange = function () {
+    var f = $('#infoFile').files[0];
+    if (!f) return;
+    if (f.size > 300000 || /\.(pdf|docx?|hwpx?|xlsx?|pptx?|png|jpe?g|gif|webp)$/i.test(f.name)) {
+      T.toast('이 파일은 여기서 못 읽어요. 제미나이의 ＋ 버튼으로 올려 주세요'); $('#infoFile').value = ''; return;
+    }
+    T.readText(f).then(function (text) {
+      var v = ($('#info').value ? $('#info').value + '\n\n' : '') + text;
+      $('#info').value = v.slice(0, T.INFO_MAX); T.store.set('info', $('#info').value);
+      T.toast(v.length > T.INFO_MAX ? '앞부분만 불러왔어요 (너무 길어요)' : '불러왔어요');
+    }, function () { T.toast('파일을 읽지 못했어요'); });
+    $('#infoFile').value = '';
+  };
+  $('#mineGo').onclick = function () {
+    T.copy(T.buildMinePrompt(T.cat(state.cat), $('#info').value), '복사했어요. 제미나이에 붙여넣기 하세요');
+  };
 
   /* 말투 안내 */
   var t = T.tone();

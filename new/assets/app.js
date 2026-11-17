@@ -21,8 +21,16 @@
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function cat(id) { for (var i = 0; i < CATS.length; i++) if (CATS[i].id === id) return CATS[i]; return null; }
   function struct(id) { for (var i = 0; i < STRUCTS.length; i++) if (STRUCTS[i].id === +id) return STRUCTS[i]; return null; }
+  /* {cust}이, {biz}는 처럼 낱말 뒤에 붙는 조사를 받침에 맞게 고친다 (손님이 / 학부모가) */
+  var JOSA = { '이': ['이', '가'], '가': ['이', '가'], '은': ['은', '는'], '는': ['은', '는'], '을': ['을', '를'], '를': ['을', '를'],
+    '과': ['과', '와'], '와': ['과', '와'], '이라서': ['이라서', '라서'], '라서': ['이라서', '라서'], '이라면': ['이라면', '라면'], '라면': ['이라면', '라면'] };
   function fill(t, c) {
-    return t.replace(/\{(biz|when|item|cust|owner)\}/g, function (m, k) { return c[k]; });
+    return t.replace(/\{(biz|when|item|cust|owner)\}(이라서|라서|이라면|라면|이|가|은|는|을|를|과|와)?(?![가-힣])/g, function (m, k, j) {
+      var w = c[k];
+      if (!j) return w;
+      var code = w.charCodeAt(w.length - 1), batchim = code >= 0xAC00 && code <= 0xD7A3 && (code - 0xAC00) % 28 !== 0;
+      return w + JOSA[j][batchim ? 0 : 1];
+    }).replace(/\{(biz|when|item|cust|owner)\}/g, function (m, k) { return c[k]; });
   }
   function param(k) { var m = new RegExp('[?&]' + k + '=([^&#]*)').exec(location.search); return m ? decodeURIComponent(m[1]) : ''; }
 
@@ -127,9 +135,47 @@
     }
     return L.join('\n');
   }
-  function aiUrl(which, prompt) {
-    var q = encodeURIComponent(prompt);
-    return which === 'claude' ? 'https://claude.ai/new?q=' + q : 'https://chatgpt.com/?q=' + q;
+  /* 제미나이는 주소로 글을 미리 넣어 줄 수 없어서, 프롬프트를 복사한 뒤 제미나이를 연다 */
+  var GEMINI = 'https://gemini.google.com/app';
+
+  /* 내 자료에서 소재 뽑기 */
+  var INFO_MAX = 6000;
+  function buildMinePrompt(c, info, asJson) {
+    var t = tone() || {}, L = [];
+    info = (info || '').trim().slice(0, INFO_MAX);
+    L.push('너는 소상공인의 스레드(Threads) 글감을 찾아 주는 편집자야.');
+    L.push('[내 자료]와 함께 올린 캡처·사진·파일을 보고, 스레드 글로 쓸 만한 소재 10개를 뽑아줘.');
+    L.push('');
+    if (c || t.name || t.intro) {
+      L.push('[내 가게]');
+      if (c) L.push('- 업종: ' + c.name);
+      if (t.name) L.push('- 이름: ' + t.name);
+      if (t.intro) L.push('- 소개: ' + t.intro);
+      L.push('');
+    }
+    L.push('[내 자료]');
+    L.push(info ? '"""\n' + info + '\n"""' : '(글 자료는 없다. 함께 올린 캡처·사진·파일을 본다.)');
+    L.push('');
+    L.push('[규칙]');
+    L.push('- 자료에 실제로 있는 내용만 쓴다. 없는 숫자, 후기, 사실을 지어내지 않는다.');
+    L.push('- 소재 하나는 한 줄, 40자 안팎. 장면, 숫자, 사람이 보이게 구체적으로 쓴다.');
+    L.push('- 서로 겹치지 않게 고른다: 손님 이야기, 만드는 과정, 가격과 기준, 실수와 배운 점, 새 소식, 자주 받는 질문 등.');
+    L.push('- 자료에 있는 전화번호, 주소, 사람 이름 같은 개인정보는 소재에 넣지 않는다.');
+    if (c && c.note) L.push('- ' + c.note);
+    L.push('');
+    L.push('[출력]');
+    if (asJson) L.push('소재 10개를 JSON 문자열 배열로만 답한다. 예: ["소재 하나", "소재 둘"]');
+    else L.push('번호를 붙여 10줄만 쓴다. 설명은 붙이지 않는다.');
+    return L.join('\n');
+  }
+  /* 글 파일(txt 등)을 읽어 글자로 돌려준다 */
+  function readText(file) {
+    return new Promise(function (ok, no) {
+      var r = new FileReader();
+      r.onload = function () { ok(String(r.result || '')); };
+      r.onerror = function () { no(new Error('read')); };
+      r.readAsText(file);
+    });
   }
   /* 글 생성 서버가 설정되어 있으면 사이트 안에서 바로 글을 받는다 */
   function apiUrl() { return (typeof TL_API === 'string' && TL_API) ? TL_API.replace(/\/+$/, '') : ''; }
@@ -154,12 +200,12 @@
     h.innerHTML = '<div class="wrap top-in"><a class="brand" href="index.html">' + logo + '<span>스레드렌즈</span></a><nav class="nav" aria-label="메뉴">' + nav + '</nav></div>';
     document.body.insertBefore(h, document.body.firstChild);
     var f = document.createElement('footer'); f.className = 'foot';
-    f.innerHTML = '<div class="wrap"><strong>스레드렌즈</strong><p>사장님 가게를 알리는 스레드 글 구조 모음. 지금은 모두 무료입니다.</p><p><a href="../">내 스레드 반응 분석하기 (THREADLENS 분석 도구) →</a></p><p class="small">말투와 찜한 계정은 지금 쓰는 기기에만 저장됩니다. 글은 ChatGPT 같은 AI가 쓰므로, 올리기 전에 사실과 다른 내용이 없는지 꼭 읽어 보세요.</p></div>';
+    f.innerHTML = '<div class="wrap"><strong>스레드렌즈</strong><p>사장님 가게를 알리는 스레드 글 구조 모음. 지금은 모두 무료입니다.</p><p><a href="../">내 스레드 반응 분석하기 (THREADLENS 분석 도구) →</a></p><p class="small">말투와 찜한 계정은 지금 쓰는 기기에만 저장됩니다. 글은 AI가 쓰므로, 올리기 전에 사실과 다른 내용이 없는지 꼭 읽어 보세요.</p></div>';
     document.body.appendChild(f);
     var b = document.createElement('nav'); b.className = 'tabbar'; b.setAttribute('aria-label', '아래 메뉴'); b.innerHTML = nav;
     document.body.appendChild(b);
   }
 
   window.TL = { store: store, $: $, $all: $all, esc: esc, cat: cat, struct: struct, fill: fill, param: param, toast: toast, copy: copy,
-    rank: rank, tone: tone, TONE_STYLES: TONE_STYLES, buildPrompt: buildPrompt, aiUrl: aiUrl, apiUrl: apiUrl, generate: generate, threadsSearch: threadsSearch, chrome: chrome };
+    rank: rank, tone: tone, TONE_STYLES: TONE_STYLES, buildPrompt: buildPrompt, GEMINI: GEMINI, INFO_MAX: INFO_MAX, buildMinePrompt: buildMinePrompt, readText: readText, apiUrl: apiUrl, generate: generate, threadsSearch: threadsSearch, chrome: chrome };
 })();

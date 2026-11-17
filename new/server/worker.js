@@ -56,7 +56,7 @@ async function overLimit(request, env) {
   const [all, mine] = await Promise.all([env.LIMITS.get(allKey), env.LIMITS.get(ipKey)]);
   const allN = parseInt(all || '0', 10);
   const mineN = parseInt(mine || '0', 10);
-  if (allN >= dailyMax) return '오늘 준비된 무료 횟수가 모두 쓰였어요. 내일 다시 오시거나 아래 ChatGPT 버튼을 써 주세요.';
+  if (allN >= dailyMax) return '오늘 준비된 무료 횟수가 모두 쓰였어요. 내일 다시 오시거나 아래 제미나이 버튼을 써 주세요.';
   if (mineN >= perIpMax) return '오늘 만들 수 있는 횟수를 다 쓰셨어요. 내일 다시 만들 수 있습니다.';
   const opt = { expirationTtl: 60 * 60 * 48 };
   await Promise.all([
