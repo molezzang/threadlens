@@ -200,7 +200,7 @@
     h.innerHTML = '<div class="wrap top-in"><a class="brand" href="index.html">' + logo + '<span>스레드렌즈</span></a><nav class="nav" aria-label="메뉴">' + nav + '</nav></div>';
     document.body.insertBefore(h, document.body.firstChild);
     var f = document.createElement('footer'); f.className = 'foot';
-    f.innerHTML = '<div class="wrap"><strong>스레드렌즈</strong><p>사장님 가게를 알리는 스레드 글 구조 모음. 지금은 모두 무료입니다.</p><p><a href="../">내 스레드 반응 분석하기 (THREADLENS 분석 도구) →</a></p><p class="small">말투와 찜한 계정은 지금 쓰는 기기에만 저장됩니다. 글은 AI가 쓰므로, 올리기 전에 사실과 다른 내용이 없는지 꼭 읽어 보세요.</p></div>';
+    f.innerHTML = '<div class="wrap"><strong>스레드렌즈</strong><p>사장님 가게를 알리는 스레드 글 구조 모음. 지금은 모두 무료입니다.</p><p class="small">말투와 찜한 계정은 지금 쓰는 기기에만 저장됩니다. 글은 AI가 쓰므로, 올리기 전에 사실과 다른 내용이 없는지 꼭 읽어 보세요.</p></div>';
     document.body.appendChild(f);
     var b = document.createElement('nav'); b.className = 'tabbar'; b.setAttribute('aria-label', '아래 메뉴'); b.innerHTML = nav;
     document.body.appendChild(b);
