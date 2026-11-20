@@ -165,6 +165,7 @@
       '<div class="result-body">' +
         (live ? '<div id="post" class="post" aria-live="polite"></div>' : '') +
         '<p class="reason">' + esc(reasonText(r)) + '</p>' +
+        '<p class="hookline"><b>첫 문장 후킹</b> ' + esc(T.hookLabel(s)) + '<br><span>' + esc(T.fill(s.hook, c)) + '</span></p>' +
         '<ol class="flow">' + s.flow.map(function (f) { return '<li>' + esc(T.fill(f, c)) + '</li>'; }).join('') + '</ol>' +
         '<div class="stack">' +
           '<a class="btn ' + (live ? 'sm' : 'primary') + '" id="gem" target="_blank" rel="noopener" href="' + T.GEMINI + '">제미나이에서 글 받기</a>' +

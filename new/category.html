@@ -56,7 +56,9 @@
       '<div class="addrow"><input type="text" id="acctIn" placeholder="찜할 계정 아이디 (예: @abc)" aria-label="찜할 계정 아이디"><button type="button" class="btn" id="acctAdd">찜</button></div>' +
       '<div class="acct" id="accts"></div></section>' +
 
-    '<section class="sec"><h2>글 구조 ' + STRUCTS.length + '개</h2><p>마음에 드는 구조를 골라 바로 글을 만들거나, 프롬프트만 복사해 가세요.</p>' +
+    '<details class="mine hookbox"><summary>첫 문장(후킹) 점검표 8가지</summary><div class="mine-in"><p class="hint">간다 마사노리·기누타 준이치의 카피 원칙을 참고했어요. 첫 문장에 3가지 이상 들어가면 세집니다. 모든 프롬프트에 이 점검이 들어가 있어요.</p><ol class="flow">' +
+        HOOK_CHECK.map(function (k) { return '<li><b>' + HOOK_KINDS[k] + '</b> ' + esc(HOOK_HOW[k]) + '</li>'; }).join('') + '</ol></div></details>' +
+      '<section class="sec"><h2>글 구조 ' + STRUCTS.length + '개</h2><p>마음에 드는 구조를 골라 바로 글을 만들거나, 프롬프트만 복사해 가세요.</p>' +
       '<div class="filters" id="filters"></div><p class="count" id="count"></p><div class="cards" id="cards"></div></section>';
 
   /* 찜한 계정 */
@@ -97,7 +99,7 @@
       return '<article class="card"><div class="card-top"><span class="no">' + s.id + '</span><span>' + GROUPS[s.g] + '</span><span>·</span><span>' +
         s.goals.map(function (g) { return GOALS[g]; }).join(', ') + '에 좋음</span></div>' +
         '<h3>' + esc(s.n) + '</h3><p class="why">' + esc(s.why) + '</p>' +
-        '<p class="hook"><span>첫 문장 예시</span>' + esc(T.fill(s.hook, c)) + '</p>' +
+        '<p class="hook"><span>첫 문장 예시 · 후킹: ' + esc(T.hookLabel(s)) + '</span>' + esc(T.fill(s.hook, c)) + '</p>' +
         '<details><summary>글 흐름 보기</summary><ol class="flow" style="margin:0;padding:0 16px 16px">' +
           s.flow.map(function (f) { return '<li>' + esc(T.fill(f, c)) + '</li>'; }).join('') + '</ol></details>' +
         '<div class="row2"><a class="btn sm primary" href="index.html?c=' + c.id + '&s=' + s.id + '">이 구조로 쓰기</a>' +

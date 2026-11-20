@@ -131,6 +131,10 @@ details.mine summary { font-size: 18px; font-weight: 800; color: var(--navy); pa
 .mine-out .chip { display: block; width: 100%; border-radius: 14px; padding: 12px 14px; font-size: 17px; line-height: 1.45; }
 .mine-out .chips { display: grid; gap: 8px; }
 
+.hookline { margin-top: 12px; padding: 12px 14px; border-left: 4px solid var(--gold); background: var(--paper); border-radius: 0 12px 12px 0; font-size: 16px; }
+.hookline span { display: block; margin-top: 4px; font-size: 18px; font-weight: 700; color: var(--navy); }
+details.hookbox { margin-top: 24px; }
+
 /* 업종 페이지 */
 .page-h { padding: 26px 0 4px; }
 .page-h h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; color: var(--navy); }

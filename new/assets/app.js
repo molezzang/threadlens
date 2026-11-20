@@ -23,12 +23,15 @@
   function struct(id) { for (var i = 0; i < STRUCTS.length; i++) if (STRUCTS[i].id === +id) return STRUCTS[i]; return null; }
   /* {cust}이, {biz}는 처럼 낱말 뒤에 붙는 조사를 받침에 맞게 고친다 (손님이 / 학부모가) */
   var JOSA = { '이': ['이', '가'], '가': ['이', '가'], '은': ['은', '는'], '는': ['은', '는'], '을': ['을', '를'], '를': ['을', '를'],
-    '과': ['과', '와'], '와': ['과', '와'], '이라서': ['이라서', '라서'], '라서': ['이라서', '라서'], '이라면': ['이라면', '라면'], '라면': ['이라면', '라면'] };
+    '과': ['과', '와'], '와': ['과', '와'], '이라서': ['이라서', '라서'], '라서': ['이라서', '라서'], '이라면': ['이라면', '라면'], '라면': ['이라면', '라면'],
+    '으로': ['으로', '로'], '로': ['으로', '로'] };
   function fill(t, c) {
-    return t.replace(/\{(biz|when|item|cust|owner)\}(이라서|라서|이라면|라면|이|가|은|는|을|를|과|와)?(?![가-힣])/g, function (m, k, j) {
+    return t.replace(/\{(biz|when|item|cust|owner)\}(이라서|라서|이라면|라면|으로|이|가|은|는|을|를|과|와|로)?(?![가-힣])/g, function (m, k, j) {
       var w = c[k];
       if (!j) return w;
-      var code = w.charCodeAt(w.length - 1), batchim = code >= 0xAC00 && code <= 0xD7A3 && (code - 0xAC00) % 28 !== 0;
+      var code = w.charCodeAt(w.length - 1), fin = (code >= 0xAC00 && code <= 0xD7A3) ? (code - 0xAC00) % 28 : 0;
+      /* '으로'는 받침이 없거나 ㄹ 받침이면 '로' */
+      var batchim = (j === '으로' || j === '로') ? (fin !== 0 && fin !== 8) : fin !== 0;
       return w + JOSA[j][batchim ? 0 : 1];
     }).replace(/\{(biz|when|item|cust|owner)\}/g, function (m, k) { return c[k]; });
   }
@@ -109,17 +112,26 @@
     L.push('');
     L.push('[글 구조: ' + s.n + ']');
     s.flow.forEach(function (f, i) { L.push((i + 1) + '. ' + fill(f, c)); });
-    L.push('첫 문장 느낌 예시: ' + fill(s.hook, c) + ' (그대로 베끼지 말고 소재에 맞게 새로 쓴다)');
+    L.push('');
+    L.push('[첫 문장(후킹) 만드는 법 — 간다 마사노리·기누타 준이치의 카피 원칙]');
+    L.push('- 첫 문장이 전부다. 스크롤을 멈추게 못 하면 나머지는 아무도 안 읽는다. 글에서 가장 공을 들인다.');
+    L.push('- 첫 문장은 넷 중 하나로 연다: ① 읽는 사람이 겪는 문제를 콕 짚기 ② 지금 봐야 하는 이유(급함) ③ 갖고 싶은 것·되고 싶은 모습 건드리기 ④ 답하고 싶어지는 질문.');
+    L.push('- 첫 두 줄 안에 누구에게 하는 말인지 콕 집어 부른다. (예: "' + fill('{when}', c) + ' 고민인 분")');
+    L.push('- 첫 문장 후보 5개를 속으로 만들고, 아래 8가지 중 몇 개가 들어갔는지 세어 3개 이상 들어간 가장 센 것을 쓴다. 이 과정은 보여주지 않는다.');
+    HOOK_CHECK.forEach(function (k) { L.push('  · ' + HOOK_KINDS[k] + ': ' + HOOK_HOW[k]); });
+    L.push('- 이 구조에 잘 맞는 후킹: ' + hookLabel(s) + '. 참고할 첫 문장: ' + fill(s.hook, c) + ' (그대로 베끼지 말고 소재로 새로 쓴다)');
+    L.push('- 둘째 줄은 첫 줄의 궁금증을 바로 풀지 말고 한 번 더 당긴다.');
+    L.push('- 숫자와 급함은 소재에 있는 사실로만 쓴다. 없으면 의외·이야기·질문으로 세게 만든다.');
     L.push('');
     L.push('[내 말투]');
     toneLines().forEach(function (x) { L.push(x); });
     L.push('');
     L.push('[규칙]');
-    L.push('- 첫 문장은 20자 안팎. 읽던 사람이 손을 멈추게 쓴다.');
+    L.push('- 첫 문장은 25자 안쪽. 설명하지 말고 장면이나 숫자나 질문으로 친다.');
     L.push('- 한 문장에 한 줄. 두세 줄마다 빈 줄을 넣는다.');
     L.push('- 전체 300자 안팎, 최대 450자.');
     L.push('- 소재에 없는 숫자, 후기, 효과, 사실을 지어내지 않는다.');
-    L.push('- "최고", "대박", "지금 바로" 같은 광고 말투를 쓰지 않는다.');
+    L.push('- "최고", "대박", "역대급" 같은 빈 과장은 쓰지 않는다. 세기는 과장이 아니라 구체성에서 나온다.');
     L.push('- 해시태그 없음. 이모지는 0~1개.');
     L.push('- ' + GOAL_END[goal || 'v']);
     if (c.note) L.push('- ' + c.note);
@@ -130,11 +142,14 @@
       L.push('제목, 설명, 따옴표, 번호를 붙이지 말고 글 본문만 보여줘.');
     } else {
       L.push('1) 바로 올릴 수 있는 완성 글 1개');
-      L.push('2) 첫 문장만 바꾼 다른 버전 2개');
+      L.push('2) 첫 문장만 바꾼 다른 버전 2개. 각각 다른 방식(예: 질문형, 숫자형, 문제 짚기형)으로 쓰고 어떤 방식인지 괄호로 적는다.');
       L.push('설명은 붙이지 말고 글만 보여줘.');
     }
     return L.join('\n');
   }
+  /* 구조가 쓰는 후킹 종류를 사람이 읽는 말로 */
+  function hookLabel(s) { return (s.hk || []).map(function (k) { return HOOK_KINDS[k]; }).join(' + '); }
+
   /* 제미나이는 주소로 글을 미리 넣어 줄 수 없어서, 프롬프트를 복사한 뒤 제미나이를 연다 */
   var GEMINI = 'https://gemini.google.com/app';
 
@@ -160,6 +175,7 @@
     L.push('[규칙]');
     L.push('- 자료에 실제로 있는 내용만 쓴다. 없는 숫자, 후기, 사실을 지어내지 않는다.');
     L.push('- 소재 하나는 한 줄, 40자 안팎. 장면, 숫자, 사람이 보이게 구체적으로 쓴다.');
+    L.push('- 소재 문장 자체가 첫 문장이 될 만큼 세게 쓴다: 문제 짚기, 질문, 숫자, 의외, 이야기 중 하나가 꼭 들어가게.');
     L.push('- 서로 겹치지 않게 고른다: 손님 이야기, 만드는 과정, 가격과 기준, 실수와 배운 점, 새 소식, 자주 받는 질문 등.');
     L.push('- 자료에 있는 전화번호, 주소, 사람 이름 같은 개인정보는 소재에 넣지 않는다.');
     if (c && c.note) L.push('- ' + c.note);
@@ -208,5 +224,5 @@
   }
 
   window.TL = { store: store, $: $, $all: $all, esc: esc, cat: cat, struct: struct, fill: fill, param: param, toast: toast, copy: copy,
-    rank: rank, tone: tone, TONE_STYLES: TONE_STYLES, buildPrompt: buildPrompt, GEMINI: GEMINI, INFO_MAX: INFO_MAX, buildMinePrompt: buildMinePrompt, readText: readText, apiUrl: apiUrl, generate: generate, threadsSearch: threadsSearch, chrome: chrome };
+    rank: rank, tone: tone, TONE_STYLES: TONE_STYLES, buildPrompt: buildPrompt, hookLabel: hookLabel, GEMINI: GEMINI, INFO_MAX: INFO_MAX, buildMinePrompt: buildMinePrompt, readText: readText, apiUrl: apiUrl, generate: generate, threadsSearch: threadsSearch, chrome: chrome };
 })();
