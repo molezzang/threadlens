@@ -101,8 +101,8 @@
     L.push('');
     L.push('[내 가게]');
     L.push('- 업종: ' + c.name);
-    if (t.name) L.push('- 이름: ' + t.name);
-    if (t.intro) L.push('- 소개: ' + t.intro);
+    if (c.brandName || t.name) L.push('- 이름: ' + (c.brandName || t.name));
+    if (c.brandIntro || t.intro) L.push('- 소개: ' + (c.brandIntro || t.intro));
     L.push('');
     L.push('[소재]');
     L.push(material || '(여기에 오늘 쓸 소재를 적으세요)');
@@ -146,11 +146,12 @@
     L.push('너는 소상공인의 스레드(Threads) 글감을 찾아 주는 편집자야.');
     L.push('[내 자료]와 함께 올린 캡처·사진·파일을 보고, 스레드 글로 쓸 만한 소재 10개를 뽑아줘.');
     L.push('');
-    if (c || t.name || t.intro) {
+    var nm = (c && c.brandName) || t.name, intro = (c && c.brandIntro) || t.intro;
+    if (c || nm || intro) {
       L.push('[내 가게]');
       if (c) L.push('- 업종: ' + c.name);
-      if (t.name) L.push('- 이름: ' + t.name);
-      if (t.intro) L.push('- 소개: ' + t.intro);
+      if (nm) L.push('- 이름: ' + nm);
+      if (intro) L.push('- 소개: ' + intro);
       L.push('');
     }
     L.push('[내 자료]');
